@@ -98,6 +98,10 @@ class Board():
     def white_pawn_west_attacks(self):
         return (self.white_pawn << np.uint(7)) & ~np.uint64(File.hexH)
 
+    @property
+    def white_pawn_attacks(self):
+        return self.white_pawn_east_attacks | self.white_pawn_west_attacks
+
     @propety
     def black_pawn_east_attacks(self):
         return (self.black_pawn >> np.uint(7)) & ~np.uint64(File.hexA)
@@ -105,6 +109,10 @@ class Board():
     @property
     def black_pawn_west_attacks(self):
         return (self.black_pawn >> np.uint(9)) & ~np.uint64(File.hexH)
+
+    @property
+    def black_pawn_attacks(self):
+        return self.black_pawn_east_attacks | self.black_pawn_west_attacks
 
     ## ---------------------------- ##
     ## Update position bitboards    ##
@@ -117,64 +125,52 @@ class Board():
             # White Pieces
             if key == Piece.wP:
                 self.white_pawn = np.uint64(0)
-                for bit in val:
-                    self.white_pawn |= set_bit(self.white_pawn, np.uint64(bit))
+                self.white_pawn |= set_bit_multi(self.white_pawn, np.uint64(val))
 
             elif key == Piece.wR:
                 self.white_rook = np.uint64(0)
-                for bit in val:
-                    self.white_rook |= set_bit(self.white_rook, np.uint64(bit))
+                self.white_rook |= set_bit_multi(self.white_rook, np.uint64(val))
 
             elif key == Piece.wN:
                 self.white_knight = np.uint64(0)
-                for bit in val:
-                    self.white_knight |= set_bit(self.white_knight, np.uint64(bit))
+                self.white_knight |= set_bit_multi(self.white_knight, np.uint64(val))
 
             elif key == Piece.wB:
                 self.white_bishop = np.uint64(0)
-                for bit in val:
-                    self.white_bishop |= set_bit(self.white_bishop, np.uint64(bit))
+                self.white_bishop |= set_bit_multi(self.white_bishop, np.uint64(val))
 
             elif key == Piece.wQ:
                 self.white_queen = np.uint64(0)
-                for bit in val:
-                    self.white_queen |= set_bit(self.white_queen, np.uint64(bit))
+                self.white_queen |= set_bit_multi(self.white_queen, np.uint64(val))
 
             elif key == Piece.wK:
                 self.white_king = np.uint64(0)
-                for bit in val:
-                    self.white_king |= set_bit(self.white_king, np.uint64(bit))
+                self.white_king |= set_bit_multi(self.white_king, np.uint64(val))
 
             # Black Pieces
             if key == Piece.bP:
                 self.black_pawn = np.uint64(0)
-                for bit in val:
-                    self.black_pawn |= set_bit(self.black_pawn, np.uint64(bit))
+                self.black_pawn |= set_bit_multi(self.black_pawn, np.uint64(val))
 
             elif key == Piece.bR:
                 self.black_rook = np.uint64(0)
-                for bit in val:
-                    self.black_rook |= set_bit(self.black_rook, np.uint64(bit))
+                self.black_rook |= set_bit_multi(self.black_rook, np.uint64(val))
 
             elif key == Piece.bN:
                 self.black_knight = np.uint64(0)
-                for bit in val:
-                    self.black_knight |= set_bit(self.black_knight, np.uint64(bit))
+                self.black_knight |= set_bit_multi(self.black_knight, np.uint64(val))
 
             elif key == Piece.bB:
                 self.black_bishop = np.uint64(0)
-                for bit in val:
-                    self.black_bishop |= set_bit(self.black_bishop, np.uint64(bit))
+                self.black_bishop |= set_bit_multi(self.black_bishop, np.uint64(val))
 
             elif key == Piece.bQ:
                 self.black_queen = np.uint64(0)
-                for bit in val:
-                    self.black_queen |= set_bit(self.black_queen, np.uint64(bit))
+                self.black_queen |= set_bit_multi(self.black_queen, np.uint64(val))
 
             elif key == Piece.bK:
                 self.black_king = np.uint64(0)
-                for bit in val:
-                    self.black_king |= set_bit(self.black_king, np.uint64(bit))
+                self.black_king |= set_bit_multi(self.black_king, np.uint64(val))
 
     ## ---------------- ##
     ## Piece movements  ##
