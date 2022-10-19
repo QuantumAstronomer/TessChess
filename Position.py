@@ -223,12 +223,176 @@ class Position():
 
         other_player = not move.colour
 
-        if self.king_in_check[other_player] and not self.any_legal_moves(other_player):
+        if self.king_in_check[other_player] and not self.has_any_moves(other_player):
             print("Checkmate")
             return self.make_checkmate_result()
 
         self.colour_to_move = not self.colour_to_move
         return self.make_move_result()
+
+    ## ------------------------------------------------ ##
+    ## Check whether the player has any possible moves  ##
+    ## ------------------------------------------------ ##
+    def has_any_moves(self, colour_to_move):
+        """
+        Returns true if any moves are possible
+        """
+        return has_king_move(colour_to_move) | has_queen_move(colour_to_move) | \
+               has_rook_move(colour_to_move) | has_bishop_move(colour_to_move) | \
+               has_pawn_move(colour_to_move) | has_knight_move(colour_to_move)
+
+    def has_king_move(self, colour_to_move) -> bool:
+        """
+        Return True if there is a legal king move for the given colour in the
+        current Position State
+        """
+        king_colour_map = {
+            Colour.WHITE : (self.white_king_attacks, Piece.wK),
+            Colour.BLACK : (self.black_king_attacks, Piece.bK),
+        }
+        attacked_squares = {
+            Colour.WHITE : self.white_attacked_squares,
+            Colour.BLACK : self.black_attacked_squares
+        }
+
+        king_attacks = king_colour_map[colour_to_move][0] & ~attacked_squares[not colour_to_move]
+        king_piece = king_colour_map[colour_to_move][1]
+
+        if not king_attacks.any():
+            return False
+
+        from_square = self.piece_map[king_piece].copy()
+        king_squares = bitboard_to_squares(king_attacks)
+
+        for to_square in king_squares:
+            if self.is_legal_king_move(Move(king_piece, (from_square, to))):
+                print("A legal king move exists")
+                return True
+        return False
+
+    def has_queen_move(self, colour_to_move) -> bool:
+        """
+        Return True if there is a legal queen move for the given colour in the
+        current Position State
+        """
+        queen_colour_map = {
+            Colour.WHITE : (self.white_queen_attacks, Piece.wQ),
+            Colour.BLACK : (self.black_queen_attacks, Piece.bQ)
+        }
+        queen_attacks = queen_colour_map[colour_to_move][0]
+        queen_piece = queen_colour_map[colour_to_move][1]
+
+        if not queen_attacks.any():
+            return False
+
+        from_squares = self.piece_map[queen_piece]
+        to_squares = bitboard_to_squares(queen_attacks)
+        for from_square in list(from_squares):
+            for to_square in to_squares:
+                if self.is_legal_queen_move(Move(queen_piece, (from_square, to_square))):
+                    print(" A legal queen move exists")
+                    return True
+        return False
+
+    def has_knight_move(self, colour_to_move) -> bool:
+        """
+        Return True if there is a legal knight move for the given colour in the
+        current Position State
+        """
+        knight_colour_map = {
+            Colour.WHITE : (self.white_knight_attacks, Piece.wN),
+            Colour.BLACK : (self.black_knight_attacks, Piece.bN)
+        }
+
+        knight_attacks = knight_colour_map[colour_to_move][0]
+        knight_piece = knight_colour_map[colour_to_move][1]
+
+        if not knight_attacks.any():
+            return False
+
+        from_squares = self.piece_map[knight_piece]
+        to_squares = bitboard_to_squares(knight_attacks)
+        for from_square in list(from_squares):
+            for to_square in to_squares:
+                if self.is_legal_knight_move(Move(knight_piece, (from_square, to_square))):
+                    print("A legal knight move exists")
+                    return True
+        return False
+
+    def has_bishop_move(self, colour_to_move) -> bool:
+        """
+        Return True if there is a legal bishop move for the given colour in the
+        current Position State
+        """
+        bishop_colour_map = {
+            Colour.WHITE : (self.white_bishop_attacks, Piece.wB),
+            Colour.BLACK : (self.black_bishop_attacks, Piece.bB)
+        }
+
+        bishop_attacks = bishop_colour_map[colour_to_move][0]
+        bishop_piece = bishop_colour_map[colour_to_move][1]
+
+        if not bishop_attacks.any():
+            return False
+
+        from_squares = self.piece_map[bishop_piece]
+        to_squares = bitboard_to_squares(bishop_attacks)
+        for from_square in list(from_squares):
+            for to_square in to_squares:
+                if self.is_legal_bishop_move(Move(bishop_piece, (from_square, to_square))):
+                    print("A legal bishop move exists")
+                    return True
+        return False
+
+    def has_rook_move(self, colour_to_move) -> bool:
+        """
+        Return True if there is a legal rook move for the given colour in the
+        current Position State
+        """
+        rook_colour_map = {
+            Colour.WHITE : (self.white_rook_attacks, Piece.wR),
+            Colour.BLACK : (self.black_rook_attacks, Piece.bR)
+        }
+
+        rook_attacks = rook_colour_map[colour_to_move][0]
+        rook_piece = rook_colour_map[colour_to_move][1]
+
+        if not rook_attacks.any():
+            return False
+
+        from_squares = self.piece_map[rook_piece]
+        to_squares = bitboard_to_squares(rook_attacks)
+        for from_square in list(from_squares):
+            for to_square in to_squares:
+                if self.is_legal_rook_move(Move(rook_piece, (from_square, to_square))):
+                    print("A legal rook move exists")
+                    return True
+        return False
+
+    def has_pawn_move(self, colour_to_move) -> bool:
+        """
+        Return True if there is a legal pawn move for the given colour in the
+        current Position State
+        """
+        pawn_colour_map = {
+            Colour.WHITE : (self.white_pawn_attacks | self.white_pawn_moves, Piece.wP),
+            Colour.BLACK : (self.black_pawn_attacks | self.black_pawn_moves, Piece.bP)
+        }
+
+        pawn_attacks = pawn_colour_map[colour_to_move][0]
+        pawn_piece = pawn_colour_map[colour_to_move][1]
+
+        if not pawn_attacks.any():
+            return False
+
+        from_squares = self.piece_map[pawn_piece]
+        to_squares = bitboard_to_squares(pawn_attacks)
+        for from_square in list(from_squares):
+            for to_square in to_squares:
+                if self.is_legal_pawn_move(Move(pawn_piece, (from_square, to_square))):
+                    print("A legal pawn move exists")
+                    return True
+        return False
 
     def is_legal_move(self, move: Move) -> bool:
         """
