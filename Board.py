@@ -5,6 +5,13 @@ from Attacks import knight_attack_maps, rook_attack_maps, bishop_attack_maps, qu
 from Constants import File, Rank, HOT, Piece, Colour
 
 class Board():
+    """
+    The board class will keep track of all the positions of each individual piece
+    using a collection of bitboards. It also keeps track of overall board configurations
+    like all occupied squares. Furthermore, the board class stores all movement and attack
+    maps, these are dictionaries for each piece that contains which squares are attacked
+    by a given piece on a given square.
+    """
 
     def __init__(self):
 
@@ -119,6 +126,10 @@ class Board():
     ## ---------------------------- ##
 
     def update_position_bitboards(self, change_map):
+        """
+        Given the map of pieces that has changed position, update the position
+        bitboards accordingly. For efficiency only those that have changed position
+        """
 
         for key, val in change_map.items():
 
