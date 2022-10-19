@@ -5,7 +5,8 @@ from Board import Board
 from Constants import File, Rank, HOT, Piece, Colour, CastleRoute, piece_to_value, user_promotion_input, white_promotion_map, black_promotion_map
 from BitboardHelpers import set_bit, set_bit_multi, clear_bit, clear_bit_multi, forward_bitscan, backward_bitscan,
                             bitboard_to_string, bitboard_to_squares, bitboard_pprint, make_uint
-from Attacks import south_ray, north_ray, west_ray, east_ray, southwest_ray, southeast_ray, northwest_ray, northeast_ray
+from Attacks import south_ray, north_ray, west_ray, east_ray, southwest_ray, southeast_ray, northwest_ray, northeast_ray,
+                    generate_king_attack_bitboard
 from Move import Move, MoveResult
 
 class PositionState():
@@ -207,11 +208,11 @@ class Position():
         if self.en_passant_side != move.colour:
             self.en_passant_target = None
 
+        ## Make a map of only the pieces that have changed position so we do not
+        ## need to update bitboards for every single piece, which is more efficient
         change_map = {key : value for key, value in self.piece_map.items() if self.piece_map[key] != original_piece_map[key]}
         self.board.update_position_bitboards(change_map)
         self.update_attack_bitboards(change_map)
-
-
 
     def make_illegal_move_result(self, message: str) -> MoveResult:
         """
@@ -308,52 +309,68 @@ class Position():
             ## Pawns
             if piece == Piece.wP:
                 for square in squares:
+                    self.white_pawn_attacks = make_uint()
+                    self.white_pawn_moves = make_uint()
                     self.update_legal_pawn_moves(square, Color.WHITE)
             if piece == Piece.bP:
                 for square in squares:
+                    self.black_pawn_attacks = make_uint()
+                    self.black_pawn_moves = make_uint()
                     self.update_legal_pawn_moves(square, Color.BLACK)
 
             ## Rooks
             if piece == Piece.wR:
                 for square in squares:
+                    self.white_rook_attacks = make_uint()
                     self.update_legal_rook_moves(square, Color.WHITE)
             if piece == Piece.bR:
                 for square in squares:
+                    self.black_rook_attacks = make_uint()
                     self.update_legal_rook_moves(square, Color.BLACK)
 
             ## Knights
             if piece == Piece.wN:
                 for square in squares:
+                    self.white_knight_attacks = make_uint()
                     self.update_legal_knight_moves(square, Color.WHITE)
             if piece == Piece.bN:
                 for square in squares:
+                    self.black_knight_attacks = make_uint()
                     self.update_legal_knight_moves(square, Color.BLACK)
 
             ## Bishops
             if piece == Piece.wB:
                 for square in squares:
+                    self.white_bishop_attacks = make_uint()
                     self.update_legal_bishop_moves(square, Color.WHITE)
             if piece == Piece.bB:
                 for square in squares:
+                    self.black_bishop_attacks = make_uint()
                     self.update_legal_bishop_moves(square, Color.BLACK)
 
             ## Queens
             if piece == Piece.wQ:
                 for square in squares:
+                    self.white_queen_attacks = make_uint()
                     self.update_legal_queen_moves(square, Color.WHITE)
             if piece == Piece.bQ:
                 for square in squares:
+                    self.black_queen_attacks = make_uint()
                     self.update_legal_queen_moves(square, Color.BLACK)
 
             ## Kings
             if piece == Piece.wK:
                 for square in squares:
+                    self.white_king_attacks = make_uint()
                     self.update_legal_king_moves(square, Color.WHITE)
-
             if piece == Piece.bK:
                 for square in squares:
+                    self.black_king_attacks = make_uint()
                     self.update_legal_king_moves(square, Color.BLACK)
 
+## ---------------------------- ##
+## Updating legal pawn moves    ##
+## ---------------------------- ##
     def update_legal_pawn_moves(self, from_square: np.uint64, colour_to_move: int):
         """
         Update the pseudo-legal Pawn moves:
@@ -407,7 +424,10 @@ class Position():
             self.black_pawn_attacks = legal_attacks[Colour.BLACK]
             self.black_pawn_moves = legal_motion[Colour.BLACK]
 
-    def update_legal_rook_moves(self, from_square: np.uint64, colour_to_move: int):
+## ---------------------------- ##
+## Updating legal rook moves    ##
+## ---------------------------- ##
+    def update_legal_rook_moves(self, from_square: np.uint64, colour_to_move: int) -> np.uint64:
         """
         Update the pseudo-legal sliding-piece moves for rank and file direction
         by getting the first blocker in each relevant direction using a bitscan.
@@ -458,3 +478,200 @@ class Position():
             self.white_rook_attacks = legal_moves
         if colour_to_move == Colour.BLACK:
             self.black_rook_attacks = legal_moves
+        return legal_moves
+
+## ---------------------------- ##
+## Updating legal knight moves  ##
+## ---------------------------- ##
+    def update_legal_knight_moves(self, from_square: np.uint64, colour_to_move: int):
+        """
+        Update the pseudo-legal knight moves. Note that a knight is not a sliding
+        piece so it can jump over any 'blocking' pieces.
+        Parameters:
+            from_square: the proposed square from which the knight is moving
+            colour_to_move: current colour to move
+        """
+        legal_knight_moves = self.board.get_knight_attack(from_square)
+        ## It can not capture friendly pieces so remove these
+        if colour_to_move == Colour.WHITE:
+            legal_knight_moves &= ~self.board.white_pieces
+            self.white_knight_attacks = legal_knight_moves
+        if colour_to_move == Colour.BLACK:
+            legal_knight_moves &= ~self.board.black_pieces
+            self.black_knight_attacks = legal_knight_moves
+
+## ---------------------------- ##
+## Updating legal bishop moves  ##
+## ---------------------------- ##
+    def update_legal_bishop_moves(self, from_square: np.uint64, colour_to_move: int) -> np.uint64:
+        """
+        Update the pseudo-legal sliding-piece moves for diagonal directions
+        by getting the first blocker in each relevant direction using a bitscan.
+        Parameters:
+            from_square: the proposed square from which the rook is moving
+            colour_to_move: current colour to move
+        """
+        bitboard = make_uint()
+        occupied = self.board.occupied_squares
+
+        northeast = northeast_ray(bitboard, from_square)
+        intersection = northeast & occupied
+        if intersection:
+            first_block = forward_bitscan(intersection)
+            block_ray = northeast_ray(bitboard, first_block)
+            northeast ^= block_ray
+
+        northwest = northwest_ray(bitboard, from_square)
+        intersection = northwest & occupied
+        if intersection:
+            first_block = forward_bitscan(intersection)
+            block_ray = northwest_ray(bitboard, first_block)
+            northwest ^= block_ray
+
+        southeast = southeast_ray(bitboard, from_square)
+        intersection = southeast & occupied
+        if intersection:
+            first_block = backward_bitscan(intersection)
+            block_ray = southeast_ray(bitboard, first_block)
+            nsouheast ^= block_ray
+
+        southwest = soutweast_ray(bitboard, from_square)
+        intersection = southwest & occupied
+        if intersection:
+            first_block = backward_bitscan(intersection)
+            block_ray = southwest_ray(bitboard, first_block)
+            southwest ^= block_ray
+
+        legal_moves = northeast | northwest | southeast | southwest
+
+        ## Remove own piece targets
+        own_piece_targets = self.occupied_squares_by_colour[colour_to_move]
+        if own_piece_targets:
+            legal_moves &= ~own_piece_targets
+
+        if colour_to_move == Colour.WHITE:
+            self.white_bishop_attacks = legal_moves
+        if colour_to_move == Colour.BLACK:
+            self.black_bishop_attacks = legal_moves
+        return legal_moves
+
+## ---------------------------- ##
+## Updating legal queen moves   ##
+## ---------------------------- ##
+    def update_legal_queen_moves(self, from_square: np.uint64, colour_to_move: int):
+        """
+        Update the pseudo-legal queen moves through a bitwise OR of the legal
+        bishop and legal rook moves.
+        Parameters:
+            from_square: the proposed square from which the rook is moving
+            colour_to_move: current colour to move
+        """
+        diagonal_moves = self.update_legal_bishop_moves(from_square, colour_to_move)
+        rankfile_moves = self.update_legal_rook_moves(from_square, colour_to_move)
+
+        legal_moves = diagonal_moves | rankfile_moves
+
+        if colour_to_move == Colour.WHITE:
+            self.white_queen_attacks = legal_moves
+        if colour_to_move == Colour.BLACK:
+            self.black_queen_attacks = legal_moves
+
+## ---------------------------- ##
+## Updating legal king moves    ##
+## ---------------------------- ##
+    def update_legal_king_moves(self, from_square: np.uint64, colour_to_move: int):
+        """
+        Update the pseudo-legal king moves: one step in each direction and in
+        special circumstances also castling.
+        Parameters:
+            from_square: the proposed square from which the rook is moving
+            colour_to_move: current colour to move
+        """
+        king_moves = generate_king_attack_bitboard(from_square)
+
+        if colour_to_move == Colour.WHITE:
+            own_piece_targets = self.board.white_pieces
+        if colour_to_move == Colour.BLACK:
+            own_piece_targets = self.board.black_pieces
+        if own_piece_targets.any():
+            king_moves &= ~own_piece_targets
+
+        ## Handle the castling moves for the king
+        can_castle = self.can_castle(colour_to_move)
+
+    ## King castling helper functions
+    def can_castle(self, colour_to_move: int) -> list:
+        """
+        Check wether or not the king of the given colour can castle and also if
+        the king can perform the castling route without being in check along
+        the way.
+        Parameters:
+            colour_to_move: current colour to move
+        Returns:
+            Tuple (bool, bool) giving the castling rights on (kingside, queenside)
+        """
+        castle_rights = self.castle_rights[colour_to_move]
+        if not castle_rights[0] and not castle_rights[1]:
+            return [0, 0]
+
+        if colour_to_move == Colour.WHITE:
+            if castle_rights[0]:
+                kingside_block = (self.black_attacked_squares |
+                                 (self.board.white_pieces & ~self.board.white_king)) & \
+                                  CastleRoute.WhiteKingside
+                rookH1 = self.board.white_rook & set_bit(make_uint(), Square.H1)
+                kingside = not kingside_block.any() and rookH1.any()
+            elif not castle_rights[0]:
+                kingside = 0
+            if castle_rights[1]:
+                queenside_block = (self.black_attacked_squares |
+                                  (self.board.white_pieces & ~self.board.white_king)) & \
+                                   CastleRoute.WhiteQueenside
+                rookA1 = self.board.white_rook & set_bit(make_uint(), Square.A1)
+                queenside = not queenside_block.any() and rookA1.any()
+            elif not castle_rights[1]:
+                queenside = 0
+            return [kingside, queenside]
+
+        if colour_to_move == Colour.BLACK:
+            if castle_rights[0]:
+                kingside_block = (self.white_attacked_squares |
+                                 (self.board.black_pieces & ~self.board.black_king)) & \
+                                  CastleRoute.BlackKingside
+                rookH8 = self.board.black_rook & set_bit(make_uint(), Square.H8)
+                kingside = not kingside_block.any() & rookH8.any()
+            elif not castle_rights[0]:
+                kingside = 0
+            if castle_rights[1]:
+                queenside_block = (self.white_attacked_squares |
+                                  (self.board.black_pieces & ~self.board.black_king)) & \
+                                   CastleRoute.BlackQueenside
+                rookA8 = self.board.black_rook & set_bit(make_uint(), Square.A8)
+                queenside = not queenside_block.any() & rookA8.any()
+            elif not castle_rights[1]:
+                queenside = 0
+            return [kingside, queenside]
+
+        @staticmethod
+        def add_castling_moves(bitboard: np.uint64, can_castle: list, colour_to_move: int) -> np.uint64:
+            """
+            Add the castling squares to the bitboard
+            Parameters:
+                bitboard: bitboard to put the castling squares into
+                can_castle: whether or not we are allowed to castle on the given side
+                colour_to_move: the colour that is to move
+            Returns:
+                bitboard containing the squares to perform the castling moves
+            """
+            if colour_to_move == Colour.WHITE:
+                if can_castle[0]:
+                    bitboard |= set_bit(bitboard, Square.G1)
+                if can_castle[1]:
+                    bitboard |= set_bit(bitboard, Square.C1)
+            if colour_to_move == Colour.BLACK:
+                if can_castle[0]:
+                    bitboard |= set_bit(bitboard, Square.G8)
+                if can_castle[1]:
+                    bitboard |= set_bit(bitboard, Square.C8)
+
+            return bitboard
