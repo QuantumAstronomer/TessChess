@@ -2,23 +2,23 @@ from Constants import Piece, Colour
 
 class Move():
 
-    def __init__(self, piece = None, squares = None):
+    def __init__(self, piece, squares: tuple[int, int]):
         self.piece = piece
         if squares:
-            self.from = squares[0]
-            self.to = squares[1]
+            self.from_square = squares[0]
+            self.to_square = squares[1]
         else:
-            self.from = None
-            self.to = None
+            self.from_square = None
+            self.to_square = None
 
         self.is_capture = False
         self.is_en_passant = False
-        self.is_castle = False
+        self.is_castling = False
         self.is_promotion = False
         self.promote_to = None
 
 
-    @propety
+    @property
     def colour(self):
         if self.piece in Piece.white_pieces:
             return Colour.WHITE

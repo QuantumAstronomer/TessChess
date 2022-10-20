@@ -2,11 +2,11 @@ import copy
 import numpy as np
 
 from Board import Board
-from Constants import File, Rank, HOT, Piece, Colour, CastleRoute, piece_to_value, user_promotion_input,
+from Constants import File, Rank, HOT, Piece, Colour, CastleRoute, piece_to_value, user_promotion_input, \
                       white_promotion_map, black_promotion_map
-from BitboardHelpers import set_bit, set_bit_multi, clear_bit, clear_bit_multi, forward_bitscan, backward_bitscan,
+from BitboardHelpers import set_bit, set_bit_multi, clear_bit, clear_bit_multi, forward_bitscan, backward_bitscan, \
                             bitboard_to_string, bitboard_to_squares, bitboard_pprint, make_uint
-from Attacks import south_ray, north_ray, west_ray, east_ray, southwest_ray, southeast_ray, northwest_ray, northeast_ray,
+from Attacks import south_ray, north_ray, west_ray, east_ray, southwest_ray, southeast_ray, northwest_ray, northeast_ray, \
                     generate_king_attack_bitboard
 from Move import Move, MoveResult
 
@@ -55,7 +55,7 @@ class Position():
         else:
             self.board = board
 
-        self.piece_map = {}
+        self.piece_map = dict()
         self.set_initial_piece_locations()
 
         self.colour_to_move = Colour.WHITE
@@ -177,20 +177,21 @@ class Position():
 
         if move.is_capture:
             self.halfmove_clock = 0
-            self.remove_opponent_piece(move.to)
+            self.remove_opponent_piece(move.to_square)
 
         if self.is_en_passant_capture:
             if move.colour == Colour.WHITE:
-                self.remove_opponent_piece(move.to - 8)
+                self.remove_opponent_piece(move.to_square - 8)
             if move.colour == Colour.BLACK:
-                self.remove_opponent_piece(move.to + 8)
+                self.remove_opponent_piece(move.to_square + 8)
 
         self.is_en_passant_capture = False
 
         if move.piece in {Piece.wP, Piece.bP}:
             self.halfmove_clock = 0
-        self.piece_map[move.piece].remove(move.from)
-        self.piece_map[move.piece].add(move.to)
+
+        self.piece_map[move.piece].remove(move.from_square)
+        self.piece_map[move.piece].add(move.to_square)
 
         if move.is_promotion:
             self.promote_pawn(move)
@@ -237,9 +238,20 @@ class Position():
         """
         Returns true if any moves are possible
         """
-        return has_king_move(colour_to_move) | has_queen_move(colour_to_move) | \
-               has_rook_move(colour_to_move) | has_bishop_move(colour_to_move) | \
-               has_pawn_move(colour_to_move) | has_knight_move(colour_to_move)
+        if self.has_king_move(colour_to_move):
+            return True
+        if self.has_queen_move(colour_to_move):
+            return True
+        if self.has_rook_move(colour_to_move):
+            return True
+        if self.has_knight_move(colour_to_move):
+            return True
+        if self.has_bishop_move(colour_to_move):
+            return True
+        if self.has_pawn_move(colour_to_move):
+            return True
+
+        return False
 
     def has_king_move(self, colour_to_move) -> bool:
         """
@@ -266,7 +278,6 @@ class Position():
 
         for to_square in king_squares:
             if self.is_legal_king_move(Move(king_piece, (from_square, to))):
-                print("A legal king move exists")
                 return True
         return False
 
@@ -290,7 +301,6 @@ class Position():
         for from_square in list(from_squares):
             for to_square in to_squares:
                 if self.is_legal_queen_move(Move(queen_piece, (from_square, to_square))):
-                    print(" A legal queen move exists")
                     return True
         return False
 
@@ -315,7 +325,6 @@ class Position():
         for from_square in list(from_squares):
             for to_square in to_squares:
                 if self.is_legal_knight_move(Move(knight_piece, (from_square, to_square))):
-                    print("A legal knight move exists")
                     return True
         return False
 
@@ -340,7 +349,6 @@ class Position():
         for from_square in list(from_squares):
             for to_square in to_squares:
                 if self.is_legal_bishop_move(Move(bishop_piece, (from_square, to_square))):
-                    print("A legal bishop move exists")
                     return True
         return False
 
@@ -365,7 +373,6 @@ class Position():
         for from_square in list(from_squares):
             for to_square in to_squares:
                 if self.is_legal_rook_move(Move(rook_piece, (from_square, to_square))):
-                    print("A legal rook move exists")
                     return True
         return False
 
@@ -390,7 +397,6 @@ class Position():
         for from_square in list(from_squares):
             for to_square in to_squares:
                 if self.is_legal_pawn_move(Move(pawn_piece, (from_square, to_square))):
-                    print("A legal pawn move exists")
                     return True
         return False
 
@@ -420,7 +426,7 @@ class Position():
             if en_passant_target:
                 self.en_passant_side = move.colour
                 self.en_passant_target = int(en_passant_target)
-            if move.to == self.en_passant_target:
+            if move.to_square == self.en_passant_target:
                 self.is_en_passant_capture = True
 
             return True
@@ -446,7 +452,7 @@ class Position():
         Check whether a move is capturing another piece in the current
         Position State of the game.
         """
-        to_square = set_bit(make_uint(), move.to)
+        to_square = set_bit(make_uint(), move.to_square)
 
         if move.colour == Colour.WHITE:
             intersects = to_square & self.board.black_pieces
@@ -462,21 +468,30 @@ class Position():
         """
         Check whether a pawn move leads to promotion.
         """
-        if pawn_move.colour == Colour.WHITE and pawn_move.to in Rank.x8:
+        if pawn_move.colour == Colour.WHITE and pawn_move.to_square in Rank.x8:
             return True
-        if pawn_move.colour == Colour.BLACK and pawn_move.to in Rank.x1:
+        if pawn_move.colour == Colour.BLACK and pawn_move.to_square in Rank.x1:
             return True
+        return False
+
+    def is_castling(self, move: Move) -> bool:
+        if move.from_square == Square.E1:
+            if move.to_square in {Square.G1, Square.C1}:
+                return True
+        if move.from_square == Square.E8:
+            if move.to_square in {Square.G8, Square.C8}:
+                return True
         return False
 
     def get_en_passant_target(self, move: Move):
         if move.piece not in {Piece.wP, Piece.bP}:
             return None
-        if move.colour = Colour.WHITE:
-            if move.to in Rank.x4 and move.from in Rank.x2:
-                return move.to - 8
+        if move.colour == Colour.WHITE:
+            if move.to_square in Rank.x4 and move.from_square in Rank.x2:
+                return move.to_square - 8
         if move.colour == Colour.BLACK:
-            if move.to in Rank.x5 and move.from in Rank.x7:
-                return move.to + 8
+            if move.to_square in Rank.x5 and move.from_square in Rank.x7:
+                return move.to_square + 8
 
     ## ---------------------------- ##
     ## Move legality by piece type  ##
@@ -487,8 +502,8 @@ class Position():
         """
         Returns True if and only if the given pawn move is fully legal
         """
-        from_bitboard = set_bit(make_uint(), move.from)
-        to_bitboard = set_bit(make_uint(), move.to)
+        from_bitboard = set_bit(make_uint(), move.from_square)
+        to_bitboard = set_bit(make_uint(), move.to_square)
         en_passant_target = make_uint()
 
         if self.en_passant_target:
@@ -502,11 +517,11 @@ class Position():
             if self.is_not_pawn_move(move):
                 return False
             ## If forwards pawnmotion, check it is not blocked by another piece
-            if move.from == move.to - 8 and (to_bitboard & self.board.occupied_squares):
+            if move.from_square == move.to_square - 8 and (to_bitboard & self.board.occupied_squares):
                 return False
             ## If pawncapture movement, check it intersects with black pieces or
             ## the en passant target
-            if move.from == move.to - 9 or move.from == move.to - 7:
+            if move.from_square == move.to_square - 9 or move.from_square == move.to_square - 7:
                 if (self.white_pawn_attacks & to_bitboard) & ~(self.board.black_pieces | en_passant_target):
                     return False
             return True
@@ -519,11 +534,11 @@ class Position():
             if self.is_not_pawn_move(move):
                 return False
             ## If forwards pawnmotion, check it is not blocked by another piece
-            if move.from == move.to + 8 and (to_bitboard & self.board.occupied_squares):
+            if move.from_square == move.to_square + 8 and (to_bitboard & self.board.occupied_squares):
                 return False
             ## If pawncapture movement, check it intersects with white pieces or
             ## the en passant target
-            if move.from == move.to + 9 or move.from == move.to + 7:
+            if move.from_square == move.to_square + 9 or move.from_square == move.to_square + 7:
                 if (self.black_pawn_attacks & to_bitboard) & ~(self.board.white_pieces | en_passant_target):
                     return False
             return True
@@ -535,7 +550,7 @@ class Position():
         """
         Returns True if and only if the proposed knight move is fully legal
         """
-        from_bitboard = set_bit(make_uint(), move.from)
+        from_bitboard = set_bit(make_uint(), move.from_square)
         if move.piece == Piece.wN:
             if not (self.board.white_knight & from_bitboard):
                 return False
@@ -558,7 +573,7 @@ class Position():
         Returns True if and only if the proposed rook move obeys the rules
         for rook movement
         """
-        from_bitboard = set_bit(make_uint(), move.from)
+        from_bitboard = set_bit(make_uint(), move.from_square)
         if move.piece == Piece.wR:
             if not (self.board.white_rook & from_bitboard):
                 return False
@@ -580,7 +595,7 @@ class Position():
         """
         Return True if and only if the proposed move is a valid bishop move
         """
-        from_bitboard = set_bit(make_uint(), move.from)
+        from_bitboard = set_bit(make_uint(), move.from_square)
         if move.piece == Piece.wB:
             if not (self.board.white_bishop & from_bitboard):
                 return False
@@ -602,7 +617,7 @@ class Position():
         """
         Return True if and only if the proposed move obeys queen movement patterns
         """
-        from_bitboard = set_bit(make_uint(), move.from):
+        from_bitboard = set_bit(make_uint(), move.from_square)
         if move.piece == Piece.wQ:
             if not(self.board.white_queen & from_bitboard):
                 return False
@@ -624,7 +639,7 @@ class Position():
         """
         Returns True if and only if the proposed move is a valid king move
         """
-        from_bitboard = set_bit(make_uint(), move.from):
+        from_bitboard = set_bit(make_uint(), move.from_square)
         if move.piece == Piece.wK:
             if not(self.board.white_king & from_bitboard):
                 return False
@@ -647,21 +662,21 @@ class Position():
 
     ## Pawns
     def is_not_pawn_move(self, move: Move) -> bool:
-        to_bitboard = set_bit(make_uint(), move.to)
+        to_bitboard = set_bit(make_uint(), move.to_square)
         if move.colour == Colour.WHITE:
-            if not (self.board.white_pawn_moves[move.from] |
-                    self.board.white_pawn_attacks[move.from]) & to_bitboard:
+            if not (self.board.white_pawn_move[move.from_square] |
+                    self.board.white_pawn_attack[move.from_square]) & to_bitboard:
                 return True
             return False
         if move.colour == Colour.BLACK:
-            if not (self.board.black_pawn_moves[move.from] |
-                    self.board.black_pawn_attacks[move.from]) & to_bitboard:
+            if not (self.board.black_pawn_move[move.from_square] |
+                    self.board.black_pawn_attack[move.from_square]) & to_bitboard:
                 return True
             return False
 
     ## Knights
     def is_not_knight_attack(self, move: Move) -> bool:
-        to_bitboard = set_bit(make_uint(), move.to)
+        to_bitboard = set_bit(make_uint(), move.to_square)
         if move.colour == Colour.WHITE:
             if not (self.white_knight_attacks & to_bitboard):
                 return True
@@ -673,7 +688,7 @@ class Position():
 
     ## Rooks
     def is_not_rook_attack(self, move: Move) -> bool:
-        to_bitboard = set_bit(make_uint(), move.to)
+        to_bitboard = set_bit(make_uint(), move.to_square)
         if move.colour == Colour.WHITE:
             if not (self.white_rook_attacks & to_bitboard):
                 return True
@@ -685,7 +700,7 @@ class Position():
 
     ## Bishops
     def is_not_bishop_attack(self, move: Move) -> bool:
-        to_bitboard = set_bit(make_uint(), move.to)
+        to_bitboard = set_bit(make_uint(), move.to_square)
         if move.colour == Colour.WHITE:
             if not (self.white_bishop_attacks & to_bitboard):
                 return True
@@ -697,8 +712,8 @@ class Position():
 
     ## Queens
     def is_not_queen_attack(self, move: Move) -> bool:
-        to_bitboard = set_bit(make_uint(), move.to)
-        if move.colour = Colour.WHITE:
+        to_bitboard = set_bit(make_uint(), move.to_square)
+        if move.colour == Colour.WHITE:
             if not (self.white_queen_attacks & to_bitboard):
                 return True
             return False
@@ -709,8 +724,8 @@ class Position():
 
     ## Kings
     def is_not_king_attack(self, move: Move) -> bool:
-        to_bitboard = set_bit(make_uint(), move.to)
-        if move.colour = Colour.WHITE:
+        to_bitboard = set_bit(make_uint(), move.to_square)
+        if move.colour == Colour.WHITE:
             if not (self.white_king_attacks & to_bitboard):
                 return True
             return False
@@ -725,7 +740,7 @@ class Position():
         """
         move_result = MoveResult()
         move_result.is_illegal_move = True
-        move_result.fen = generate_fen(self)
+        move_result.fen = None
         print(message)
         return move_result
 
@@ -734,7 +749,7 @@ class Position():
         Return a move result
         """
         move_result = MoveResult()
-        move_result.fen = generate_fen(self)
+        move_result.fen = None
         return move_result
 
     def make_checkmate_result(self) -> MoveResult:
@@ -743,7 +758,7 @@ class Position():
         """
         move_result = MoveResult()
         move_result.is_checkmate = True
-        move_result.fen = generate_fen(self)
+        move_result.fen = None
         return move_result
 
     def remove_opponent_piece(self, to_square):
@@ -769,18 +784,25 @@ class Position():
             if not legal_piece:
                 print("Please choose a legal promotion")
                 continue
-            self.piece_map[move.piece].remove(move.to)
+            self.piece_map[move.piece].remove(move.to_square)
             new_piece = self.get_promotion_piece_type(legal_piece, move)
-            self.piece_map[new_piece].add(move.to)
+            self.piece_map[new_piece].add(move.to_square)
             break
 
-    def get_promotion_piece_type(self, legal_piece, move):
+    def get_promotion_piece_type(self, legal_piece, move: Move):
         if move.colour == Colour.WHITE:
             return white_promotion_map[legal_piece]
         if move.colour == Colour.BLACK:
             return black_promotion_map[legal_piece]
 
-    def move_rooks_for_castling(self, move):
+    def get_piece_on_square(self, from_square: int):
+        for key, value in self.piece_map.items():
+            for square in value:
+                if square == from_square:
+                    return key
+        return None
+
+    def move_rooks_for_castling(self, move: Move):
         """
         Perform a castling move given the side that is playing
         """
@@ -796,10 +818,10 @@ class Position():
             Square.C8 : (Square.A8, Square.D8),
         }
 
-        self.piece_map[rook_colour_map[move.colour]].remove(square_map[move.to][0])
-        self.piece_map[rook_colour_map[move.colour]].add(square_map[move.to][1])
+        self.piece_map[rook_colour_map[move.colour]].remove(square_map[move.to_square][0])
+        self.piece_map[rook_colour_map[move.colour]].add(square_map[move.to_square][1])
 
-    def adjust_castling_rights(self, move):
+    def adjust_castling_rights(self, move: Move):
         """
         Adjust the castling rights after a castling move is performed or when
         given rooks are moved
@@ -811,14 +833,14 @@ class Position():
                 self.castle_rights[Colour.BLACK] == [0, 0]
 
             if move.piece == Piece.wR:
-                if move.from == Square.H1:
+                if move.from_square == Square.H1:
                     self.castle_rights[Colour.WHITE][0] = 0
-                if move.from == Square.A1:
+                if move.from_square == Square.A1:
                     self.castle_rights[Colour.WHITE][1] = 0
             if move.piece == Piece.bR:
-                if move.from == Square.H8:
+                if move.from_square == Square.H8:
                     self.castle_rights[Colour.BLACK][0] = 0
-                if move.from == Square.A8:
+                if move.from_square == Square.A8:
                     self.castle_rights[Colour.BLACK][1] = 0
 
     def update_attack_bitboards(self, change_map):
@@ -826,68 +848,68 @@ class Position():
         Update all attack bitboards that have changed after the
         move has been executed
         """
-        for piece, squares in self.change_map.items():
+        for piece, squares in change_map.items():
             ## Pawns
             if piece == Piece.wP:
                 for square in squares:
                     self.white_pawn_attacks = make_uint()
                     self.white_pawn_moves = make_uint()
-                    self.update_legal_pawn_moves(square, Color.WHITE)
+                    self.update_legal_pawn_moves(square, Colour.WHITE)
             if piece == Piece.bP:
                 for square in squares:
                     self.black_pawn_attacks = make_uint()
                     self.black_pawn_moves = make_uint()
-                    self.update_legal_pawn_moves(square, Color.BLACK)
+                    self.update_legal_pawn_moves(square, Colour.BLACK)
 
             ## Rooks
             if piece == Piece.wR:
                 for square in squares:
                     self.white_rook_attacks = make_uint()
-                    self.update_legal_rook_moves(square, Color.WHITE)
+                    self.update_legal_rook_moves(square, Colour.WHITE)
             if piece == Piece.bR:
                 for square in squares:
                     self.black_rook_attacks = make_uint()
-                    self.update_legal_rook_moves(square, Color.BLACK)
+                    self.update_legal_rook_moves(square, Colour.BLACK)
 
             ## Knights
             if piece == Piece.wN:
                 for square in squares:
                     self.white_knight_attacks = make_uint()
-                    self.update_legal_knight_moves(square, Color.WHITE)
+                    self.update_legal_knight_moves(square, Colour.WHITE)
             if piece == Piece.bN:
                 for square in squares:
                     self.black_knight_attacks = make_uint()
-                    self.update_legal_knight_moves(square, Color.BLACK)
+                    self.update_legal_knight_moves(square, Colour.BLACK)
 
             ## Bishops
             if piece == Piece.wB:
                 for square in squares:
                     self.white_bishop_attacks = make_uint()
-                    self.update_legal_bishop_moves(square, Color.WHITE)
+                    self.update_legal_bishop_moves(square, Colour.WHITE)
             if piece == Piece.bB:
                 for square in squares:
                     self.black_bishop_attacks = make_uint()
-                    self.update_legal_bishop_moves(square, Color.BLACK)
+                    self.update_legal_bishop_moves(square, Colour.BLACK)
 
             ## Queens
             if piece == Piece.wQ:
                 for square in squares:
                     self.white_queen_attacks = make_uint()
-                    self.update_legal_queen_moves(square, Color.WHITE)
+                    self.update_legal_queen_moves(square, Colour.WHITE)
             if piece == Piece.bQ:
                 for square in squares:
                     self.black_queen_attacks = make_uint()
-                    self.update_legal_queen_moves(square, Color.BLACK)
+                    self.update_legal_queen_moves(square, Colour.BLACK)
 
             ## Kings
             if piece == Piece.wK:
                 for square in squares:
                     self.white_king_attacks = make_uint()
-                    self.update_legal_king_moves(square, Color.WHITE)
+                    self.update_legal_king_moves(square, Colour.WHITE)
             if piece == Piece.bK:
                 for square in squares:
                     self.black_king_attacks = make_uint()
-                    self.update_legal_king_moves(square, Color.BLACK)
+                    self.update_legal_king_moves(square, Colour.BLACK)
 
 ## ---------------------------- ##
 ## Updating legal pawn moves    ##
@@ -907,15 +929,15 @@ class Position():
         self.black_pawn_attacks = self.board.black_pawn_attacks
 
         legal_motion = {
-            Colour.WHITE : self.board.white_pawn_moves[from_square],
-            Colour.BLACK : self.board.black_pawn_moves[from_square]
+            Colour.WHITE : self.board.white_pawn_move[from_square],
+            Colour.BLACK : self.board.black_pawn_move[from_square]
         }
 
-        legal_motion &= self.board.empty_squares
+        legal_motion[colour_to_move] &= self.board.empty_squares
 
         legal_attacks = {
-            Colour.WHITE : self.board.white_pawn_attacks[from_square],
-            Colour.BLACK : self.board.black_pawn_attacks[from_square]
+            Colour.WHITE : self.board.white_pawn_attack[from_square],
+            Colour.BLACK : self.board.black_pawn_attack[from_square]
         }
 
         ## Handling en-passant for the pawns
