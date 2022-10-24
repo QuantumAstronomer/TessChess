@@ -74,7 +74,7 @@ def east_ray(bitboard: np.uint64, from_square: int) -> np.uint64:
         bitboard of all eastern squares attacked on an empty bitboard
     """
     original_square = from_square
-    bitboard = set_bit_multi(bitboard, from_square + np.array(range(0, from_square % 8, 1)))
+    bitboard = set_bit_multi(bitboard, from_square + np.array(range(0, 8 - from_square % 8, 1)))
     bitboard = clear_bit(bitboard, original_square)
     return bitboard
 

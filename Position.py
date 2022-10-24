@@ -2,8 +2,8 @@ import copy
 import numpy as np
 
 from Board import Board
-from Constants import File, Rank, HOT, Piece, Colour, CastleRoute, piece_to_value, user_promotion_input, \
-                      white_promotion_map, black_promotion_map
+from Constants import File, Rank, HOT, Piece, Colour, CastleRoute, Square, piece_to_value, \
+                      user_promotion_input, white_promotion_map, black_promotion_map
 from BitboardHelpers import set_bit, set_bit_multi, clear_bit, clear_bit_multi, forward_bitscan, backward_bitscan, \
                             bitboard_to_string, bitboard_to_squares, bitboard_pprint, make_uint
 from Attacks import south_ray, north_ray, west_ray, east_ray, southwest_ray, southeast_ray, northwest_ray, northeast_ray, \
@@ -277,7 +277,7 @@ class Position():
         king_squares = bitboard_to_squares(king_attacks)
 
         for to_square in king_squares:
-            if self.is_legal_king_move(Move(king_piece, (from_square, to))):
+            if self.is_legal_king_move(Move(king_piece, (from_square, to_square))):
                 return True
         return False
 
@@ -678,11 +678,11 @@ class Position():
     def is_not_knight_attack(self, move: Move) -> bool:
         to_bitboard = set_bit(make_uint(), move.to_square)
         if move.colour == Colour.WHITE:
-            if not (self.white_knight_attacks & to_bitboard):
+            if not (self.board.knight_attacks[move.from_square] & to_bitboard):
                 return True
             return False
         if move.colour == Colour.BLACK:
-            if not (self.black_knight_attacks & to_bitboard):
+            if not (self.board.knight_attacks[move.from_square] & to_bitboard):
                 return True
             return False
 
@@ -690,11 +690,11 @@ class Position():
     def is_not_rook_attack(self, move: Move) -> bool:
         to_bitboard = set_bit(make_uint(), move.to_square)
         if move.colour == Colour.WHITE:
-            if not (self.white_rook_attacks & to_bitboard):
+            if not (self.board.rook_attacks[move.from_square] & to_bitboard):
                 return True
             return False
         if move.colour == Colour.BLACK:
-            if not (self.black_rook_attacks & to_bitboard):
+            if not (self.board.rook_attacks[move.from_square] & to_bitboard):
                 return True
             return False
 
@@ -702,11 +702,11 @@ class Position():
     def is_not_bishop_attack(self, move: Move) -> bool:
         to_bitboard = set_bit(make_uint(), move.to_square)
         if move.colour == Colour.WHITE:
-            if not (self.white_bishop_attacks & to_bitboard):
+            if not (self.board.bishop_attacks[move.from_square] & to_bitboard):
                 return True
             return False
         if move.colour == Colour.BLACK:
-            if not (self.black_bishop_attacks & to_bitboard):
+            if not (self.board.bishop_attacks[move.from_square] & to_bitboard):
                 return True
             return False
 
@@ -714,11 +714,11 @@ class Position():
     def is_not_queen_attack(self, move: Move) -> bool:
         to_bitboard = set_bit(make_uint(), move.to_square)
         if move.colour == Colour.WHITE:
-            if not (self.white_queen_attacks & to_bitboard):
+            if not (self.board.queen_attacks[move.from_square] & to_bitboard):
                 return True
             return False
         if move.colour == Colour.BLACK:
-            if not (self.black_queen_attacks & to_bitboard):
+            if not (self.board.queen_attacks[move.from_square] & to_bitboard):
                 return True
             return False
 
@@ -726,11 +726,11 @@ class Position():
     def is_not_king_attack(self, move: Move) -> bool:
         to_bitboard = set_bit(make_uint(), move.to_square)
         if move.colour == Colour.WHITE:
-            if not (self.white_king_attacks & to_bitboard):
+            if not (self.board.king_attacks[move.from_square] & to_bitboard):
                 return True
             return False
         if move.colour == Colour.BLACK:
-            if not (self.black_king_attacks & to_bitboard):
+            if not (self.board.king_attacks[move.from_square] & to_bitboard):
                 return True
             return False
 
@@ -1076,9 +1076,9 @@ class Position():
         if intersection:
             first_block = backward_bitscan(intersection)
             block_ray = southeast_ray(bitboard, first_block)
-            nsouheast ^= block_ray
+            southeast ^= block_ray
 
-        southwest = soutweast_ray(bitboard, from_square)
+        southwest = southwest_ray(bitboard, from_square)
         intersection = southwest & occupied
         if intersection:
             first_block = backward_bitscan(intersection)
